@@ -1,0 +1,8 @@
+torch
+numpy
+matplotlib
+pytest
+scipy
+pandas
+shapely
+pyvista
