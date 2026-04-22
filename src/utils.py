@@ -63,13 +63,14 @@ def visualize_loss(loss_history, loss_energy_history, loss_bc_left_history):
 
     axes_res[0].plot(loss_history)
     axes_res[0].set_title(f"Total Loss")
-    #axes_res.set_yscale('log')
+    axes_res.set_yscale('log')
 
     axes_res[1].plot(loss_energy_history)
     axes_res[1].set_title(f"Energy Loss")
 
     axes_res[2].plot(loss_bc_left_history)
     axes_res[2].set_title(f"Dirchlet Loss")
+    axes_res.set_yscale('log')
 
 
     plt.tight_layout()

@@ -15,12 +15,6 @@ class PINNSolver:
         self.optimizer_adamw = optim.AdamW(self.model.parameters(), lr=lr)
         self.optimizer_lbfgs = optim.LBFGS(self.model.parameters(), lr=1e-1, max_iter = 5000, history_size=50, line_search_fn='strong_wolfe')
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer_adamw, T_max=epochs, eta_min=1e-5)
-        # Coefficients de pondération initiaux
-        self.lambda_pde_eq = 10.0
-        self.lambda_pde_const = 100
-        self.lambda_bc_left = 10.0   
-        self.lambda_bc_right = 10.0  
-        self.lambda_bc_free = 100.0  
 
         # Nombre de points à générer 
         self.n_points_col = n_points_col
@@ -28,41 +22,6 @@ class PINNSolver:
         self.p = p
         self.device = device
         self.geo = Geometry(L, H, device)
-
-    '''
-    def compute_loss(self, E, nu, x_col, y_col, x_bc_left, y_bc_left, x_bc_right, y_bc_right, x_bc_top, y_bc_top, x_bc_bot, y_bc_bot):
-        
-        # 1. Appel au Model
-        u, v, sxx, syy, sxy = self.model(x_col, y_col)
-        
-        # 2. PDE Loss (Mixte)
-        res_eq_x, res_eq_y, res_c_xx, res_c_yy, res_c_xy = linear_elasticity_mixed_residual(u, v, sxx, syy, sxy, x_col, y_col, E, nu)
-        loss_pde_eq = torch.mean(res_eq_x**2 + res_eq_y**2 )
-        loss_pde_const = torch.mean(res_c_xx**2 + res_c_yy**2 + res_c_xy**2)
-        
-        # 3. BC Dirichlet (Left) - sur u et v
-        u_l, v_l, _, _, _ = self.model(x_bc_left, y_bc_left)
-        loss_bc_left = torch.mean(u_l**2 + v_l**2)
-        
-        # 4. BC Neumann (Right) -
-        _, _, sxx_r, _, sxy_r = self.model(x_bc_right, y_bc_right)
-        # Profil parabolique : - (3*P)/(2*H) * (1 - (2*y/H)^2)
-        y_norm = (2.0 * y_bc_right) / self.geo.H
-        sxy_target = - (3.0 * self.p) / (2.0 * self.geo.H) * (1.0 - y_norm**2)
-        loss_bc_right = torch.mean((sxy_r - sxy_target)**2 + sxx_r**2)
-        
-        # 3.3 Top Neumann sigma_xy = 0 et sigma_yy = 0
-        _, _, _, syy_t, sxy_t = self.model(x_bc_top, y_bc_top)
-        loss_bc_top = torch.mean((sxy_t)**2 + (syy_t)**2 )
-
-        # 3.4 Bot Neumann sigma_xy = 0 et sigma_yy = 0
-        _, _, _, syy_b, sxy_b = self.model(x_bc_bot, y_bc_bot)
-        loss_bc_bot = torch.mean((sxy_b)**2 + (syy_b)**2 )
-
-        loss_free = loss_bc_bot + loss_bc_top
-
-        return loss_pde_eq, loss_pde_const, loss_bc_left, loss_bc_right, loss_free
-    '''
 
     def compute_loss(self, E, nu, x_col, y_col, x_bc_right, y_bc_right, x_bc_left, y_bc_left):
 
@@ -97,8 +56,6 @@ class PINNSolver:
         # 1. Génération des points 
 
         x_col, y_col = self.geo.generate_collocation_points(self.n_points_col)
-        #x_bc_top, y_bc_top = self.geo.generate_border_top(self.n_points_bc)
-        #x_bc_bot, y_bc_bot = self.geo.generate_border_bot(self.n_points_bc)
         x_bc_left, y_bc_left = self.geo.generate_border_left(self.n_points_bc)
         x_bc_right, y_bc_right = self.geo.generate_border_right(self.n_points_bc)
 
@@ -129,8 +86,6 @@ class PINNSolver:
             # 1. Génération des points 
             torch.manual_seed(42)
             x_col, y_col = self.geo.generate_collocation_points(self.n_points_col)
-             #x_bc_top, y_bc_top = self.geo.generate_border_top(self.n_points_bc)
-            #x_bc_bot, y_bc_bot = self.geo.generate_border_bot(self.n_points_bc)
             x_bc_left, y_bc_left = self.geo.generate_border_left(self.n_points_bc)
             x_bc_right, y_bc_right = self.geo.generate_border_right(self.n_points_bc)
 
