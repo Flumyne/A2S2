@@ -44,7 +44,7 @@ class NeuralNet(nn.Module):
         layers = []
         for i in range(num_layers):
             layers.append(nn.Linear(current_dim, hidden_dim))
-            layers.append(nn.SiLU()) 
+            layers.append(nn.Tanh()) 
             current_dim = hidden_dim
         
         # Couche de sortie
@@ -67,7 +67,7 @@ class NeuralNet(nn.Module):
             inputs = inputs_norm
 
         raw = self.net(inputs)
-        mask = (1.0 - torch.exp(-x))
+        mask = x
         u = mask * raw[:,0:1]
         v = mask * raw[:,1:2]
 

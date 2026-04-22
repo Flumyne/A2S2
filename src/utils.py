@@ -83,4 +83,4 @@ def visualize_loss(loss_history, loss_pde_history, loss_bc_left_history, loss_bc
 
 
     plt.tight_layout()
-    plt.savefig("Residual_A2S2_V0_07.png", dpi=150, bbox_inches='tight')
+    plt.savefig("Residual_A2S2_V0_09.png", dpi=150, bbox_inches='tight')

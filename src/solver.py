@@ -50,8 +50,7 @@ class PINNSolver:
         # 3. Perte BC (Conditions aux limites)
         # 3.1 Left Dirichlet = 0
         u_bc_left_pred = self.model(x_bc_left, y_bc_left)
-        dv_dx = get_gradients(u_bc_left_pred[:,1:2], x_bc_left)
-        loss_bc_left = torch.mean((u_bc_left_pred[:, 0:1])**2 + (u_bc_left_pred[:, 1:2])**2 + (dv_dx)**2)
+        loss_bc_left = torch.mean((u_bc_left_pred[:, 0:1])**2 + (u_bc_left_pred[:, 1:2])**2)
 
         # 3.2 Right Neumann sigma_xy = -p/H
         u_bc_right_pred = self.model(x_bc_right, y_bc_right)
@@ -110,8 +109,7 @@ class PINNSolver:
             # 3. Perte BC (Conditions aux limites)
             # 3.1 Left Dirichlet = 0
             u_bc_left_pred = self.model(x_bc_left, y_bc_left)
-            dv_dx = get_gradients(u_bc_left_pred[:,1:2], x_bc_left)
-            loss_bc_left = torch.mean((u_bc_left_pred[:, 0:1])**2 + (u_bc_left_pred[:, 1:2])**2 + (dv_dx)**2)
+            loss_bc_left = torch.mean((u_bc_left_pred[:, 0:1])**2 + (u_bc_left_pred[:, 1:2])**2 )
 
             # 3.2 Right Neumann sigma_xy parabolique exact (Théorie des poutres)
             u_bc_right_pred = self.model(x_bc_right, y_bc_right)
@@ -208,7 +206,7 @@ if __name__ == "__main__":
     solver.train_lbfgs(E, nu, histories)
 
 
-    torch.save(model.state_dict(), "A2S2_model_V0_07.pth")
+    torch.save(model.state_dict(), "A2S2_model_V0_09.pth")
     print("Modèle enregistré avec succès !")
 
     visualize_loss(loss_total_history, loss_pde_history, loss_bc_left_history, loss_bc_right_history, loss_bc_free_history)

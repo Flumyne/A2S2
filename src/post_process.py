@@ -74,7 +74,7 @@ def run_inference(model_path, L, H, E, nu, device):
         ax.set_ylim([-H/2, H/2])
 
     plt.tight_layout()
-    output_name = "Field_Structure_A2S2_V0_07.png"
+    output_name = "Field_Structure_A2S2_V0_09.png"
     plt.savefig(output_name, dpi=200)
     print(f"Visualisation sauvegardée sous : {output_name}")
 
@@ -94,4 +94,4 @@ if __name__ == "__main__":
     E = 1.0
     nu = 0.33
     
-    run_inference('A2S2_model_V0_07.pth', L, H, E, nu, device)
+    run_inference('A2S2_model_V0_09.pth', L, H, E, nu, device)
