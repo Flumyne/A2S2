@@ -74,6 +74,22 @@ def linear_elasticity_2d_residual(u, v, x, y, E=1.0, nu=0.3):
     
     return res_x, res_y
 
+
+def linear_elasticity_mixed_residual(u, v, sxx, syy, sxy, x, y, E=1.0, nu=0.3):
+    # 1. Résidus d'équilibre 
+    res_eq_x = get_gradients(sxx, x) + get_gradients(sxy, y)
+    res_eq_y = get_gradients(sxy, x) + get_gradients(syy, y)
+
+    # 2. Résidus Constitutifs (Cohérence avec Hooke)
+    sxx_h, syy_h, sxy_h = compute_stresses(u, v, x, y, E, nu)
+    
+    res_c_xx = sxx - sxx_h
+    res_c_yy = syy - syy_h
+    res_c_xy = sxy - sxy_h
+
+    return res_eq_x, res_eq_y, res_c_xx, res_c_yy, res_c_xy
+
+
 if __name__ == "__main__":
     # Test rapide de la forme des tenseurs
     x = torch.linspace(0, 1, 10, requires_grad=True).view(-1, 1)

@@ -51,7 +51,7 @@ class Normalizer:
         self.std = self.std.cuda()
         return self    
 
-def visualize_loss(loss_history, loss_pde_history, loss_bc_left_history, loss_bc_right_history, loss_bc_free_history):
+def visualize_loss(loss_history, loss_pde_eq_history, loss_pde_const_history, loss_bc_left_history, loss_bc_right_history, loss_bc_free_history):
     """
     Generates plots of training loss history to monitor convergence behavior.
 
@@ -65,13 +65,17 @@ def visualize_loss(loss_history, loss_pde_history, loss_bc_left_history, loss_bc
     axes_res[0,0].set_title(f"Total Loss")
     axes_res[0,0].set_yscale('log')
 
-    axes_res[1,0].plot(loss_pde_history)
-    axes_res[1,0].set_title(f"PDE")
+    axes_res[1,0].plot(loss_pde_eq_history)
+    axes_res[1,0].set_title(f"PDE_eq")
     axes_res[1,0].set_yscale('log')
 
-    axes_res[2,0].plot(loss_bc_left_history)
-    axes_res[2,0].set_title(f"BC LEFT")
+    axes_res[2,0].plot(loss_pde_const_history)
+    axes_res[2,0].set_title(f"PDE_const")
     axes_res[2,0].set_yscale('log')
+
+    axes_res[2,1].plot(loss_bc_left_history)
+    axes_res[2,1].set_title(f"BC LEFT")
+    axes_res[2,1].set_yscale('log')
 
     axes_res[0,1].plot(loss_bc_right_history)
     axes_res[0,1].set_title(f"BC RIGHT")
@@ -83,4 +87,5 @@ def visualize_loss(loss_history, loss_pde_history, loss_bc_left_history, loss_bc
 
 
     plt.tight_layout()
-    plt.savefig("Residual_A2S2_V0_09.png", dpi=150, bbox_inches='tight')
+    plt.savefig("Residual_A2S2_V0_12.png", dpi=150, bbox_inches='tight')
+    

@@ -18,7 +18,7 @@ def run_inference(model_path, L, H, E, nu, device):
     normalizer = Normalizer(X_sample, device=device)
 
     # 1. Chargement du modèle
-    model = NeuralNet(normalizer, input_dim=2, hidden_dim=128, output_dim=2, use_fourier=False).to(device)
+    model = NeuralNet(normalizer, input_dim=2, hidden_dim=50,  use_fourier=False).to(device)
     state_dict = torch.load(model_path, map_location=device)
     model.load_state_dict(state_dict)
     model.eval()
@@ -32,22 +32,18 @@ def run_inference(model_path, L, H, E, nu, device):
     y_flat = Y.reshape(-1, 1).requires_grad_(True)
 
     # 3. Calcul de u,v et des contraintes (en mode Tenseur)
-    u_v = model(x_flat, y_flat)
-    u_pred = u_v[:, 0:1]
-    v_pred = u_v[:, 1:2]
-    
-    sig_xx, sig_yy, sig_xy = compute_stresses(u_pred, v_pred, x_flat, y_flat, E, nu)
+    u, v, sxx, syy, sxy = model(x_flat, y_flat)
 
     # 4. Calcul Von Mises (en Tenseur)
     # sigma_vm = sqrt(sig_xx^2 - sig_xx*sig_yy + sig_yy^2 + 3*sig_xy^2)
-    vm_tensor = torch.sqrt(sig_xx**2 - sig_xx*sig_yy + sig_yy**2 + 3*sig_xy**2)
+    vm_tensor = torch.sqrt(sxx**2 - sxx*syy + syy**2 + 3*sxy**2)
 
     # 5. Conversion vers Numpy pour Matplotlib
     x_plot = x_flat.detach().cpu().numpy()
     y_plot = y_flat.detach().cpu().numpy()
     K_scale = 1e5
-    u_plot_val = u_pred.detach().cpu().numpy() / K_scale
-    v_plot_val = v_pred.detach().cpu().numpy() / K_scale
+    u_plot_val = u.detach().cpu().numpy() / K_scale
+    v_plot_val = v.detach().cpu().numpy() / K_scale
     vm_plot_val = vm_tensor.detach().cpu().numpy() / K_scale
 
     # --- Plotting ---
@@ -74,7 +70,7 @@ def run_inference(model_path, L, H, E, nu, device):
         ax.set_ylim([-H/2, H/2])
 
     plt.tight_layout()
-    output_name = "Field_Structure_A2S2_V0_09.png"
+    output_name = "Field_Structure_A2S2_V0_12.png"
     plt.savefig(output_name, dpi=200)
     print(f"Visualisation sauvegardée sous : {output_name}")
 
@@ -85,7 +81,7 @@ if __name__ == "__main__":
     # Paramètres de normalisation (identiques au solver)
     E_ref = 70e9
     L_ref = 1.0 
-    H_ref = 0.1
+    H_ref = 0.2
     p_ref = 1000
 
     # Valeurs adimensionnelles
@@ -94,4 +90,4 @@ if __name__ == "__main__":
     E = 1.0
     nu = 0.33
     
-    run_inference('A2S2_model_V0_09.pth', L, H, E, nu, device)
+    run_inference('A2S2_model_V0_12.pth', L, H, E, nu, device)
