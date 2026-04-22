@@ -90,6 +90,28 @@ def linear_elasticity_mixed_residual(u, v, sxx, syy, sxy, x, y, E=1.0, nu=0.3):
     return res_eq_x, res_eq_y, res_c_xx, res_c_yy, res_c_xy
 
 
+def compute_strain_energy(u, v, x, y, E, nu):
+
+    # 1. Calcul des gradients
+    u_x = get_gradients(u, x)
+    u_y = get_gradients(u, y)
+    v_x = get_gradients(v, x)
+    v_y = get_gradients(v, y)
+
+    # 2. Calcul des déformations 
+
+    esp_xx = u_x 
+    esp_yy = v_y 
+    gamma_xy = u_y + v_x
+
+    # 3. Calcul de la densité d'énergie de déformation (W_int)
+    prefactor = E / (2.0* (1.0 - nu**2))
+    W_int = prefactor* (esp_xx**2 + esp_yy**2 + 2*nu*esp_xx*esp_yy + ((1-nu)/2)*gamma_xy**2)
+
+    return W_int
+
+
+
 if __name__ == "__main__":
     # Test rapide de la forme des tenseurs
     x = torch.linspace(0, 1, 10, requires_grad=True).view(-1, 1)

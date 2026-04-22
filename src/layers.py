@@ -55,9 +55,6 @@ class NeuralNet(nn.Module):
 
         self.net_u = make_block(1)
         self.net_v = make_block(1)
-        self.net_sxx = make_block(1)
-        self.net_syy = make_block(1)
-        self.net_sxy = make_block(1)
 
 
     def forward(self, x, y):
@@ -75,13 +72,11 @@ class NeuralNet(nn.Module):
 
         u_raw = self.net_u(inputs)
         v_raw = self.net_v(inputs)
-        sxx_raw = self.net_sxx(inputs)
-        syy_raw = self.net_syy(inputs)
-        sxy_raw = self.net_sxy(inputs)
 
         # Masque sur les deplacement (hard_constraints)
-        mask = x 
-        u = mask * u_raw
-        v = mask * v_raw
+        mask_u = 1.0
+        mask_v = 1.0 
+        u = mask_u * u_raw
+        v = mask_v * v_raw
 
-        return u, v, sxx_raw, syy_raw, sxy_raw
+        return u, v

@@ -1,7 +1,7 @@
 import torch
 import torch.optim as optim
 from layers import NeuralNet
-from pde_residuals import linear_elasticity_2d_residual, compute_stresses, linear_elasticity_mixed_residual
+from pde_residuals import linear_elasticity_2d_residual, compute_stresses, linear_elasticity_mixed_residual, compute_strain_energy
 from data_gen import Geometry
 from utils import visualize_loss, Normalizer
 
@@ -29,6 +29,7 @@ class PINNSolver:
         self.device = device
         self.geo = Geometry(L, H, device)
 
+    '''
     def compute_loss(self, E, nu, x_col, y_col, x_bc_left, y_bc_left, x_bc_right, y_bc_right, x_bc_top, y_bc_top, x_bc_bot, y_bc_bot):
         
         # 1. Appel au Model
@@ -61,7 +62,31 @@ class PINNSolver:
         loss_free = loss_bc_bot + loss_bc_top
 
         return loss_pde_eq, loss_pde_const, loss_bc_left, loss_bc_right, loss_free
+    '''
 
+    def compute_loss(self, E, nu, x_col, y_col, x_bc_right, y_bc_right, x_bc_left, y_bc_left):
+
+        # 1. Energie interne (sur tout le domaine)
+        u_col, v_col = self.model(x_col, y_col)
+        W_int = compute_strain_energy(u_col, v_col, x_col, y_col, E, nu)
+        U = torch.mean(W_int)
+
+        # 2. Travail Externe (Sur les bords)
+        u_r, v_r = self.model(x_bc_right, y_bc_right)
+        y_norm = (2.0 * y_bc_right)/self.geo.H
+        sxy_target = - (3.0 * self.p) / (2.0*self.geo.H)* (1.0 - y_norm**2)
+
+        # Travail = Force * Déplacement (force selon y donc v_r)
+        # On divise par L pour normaliser par rapport au volume (puisque Volume = Surface * L)
+        W_ext = torch.mean(sxy_target * v_r) / self.geo.L
+
+        loss_energy = U - W_ext
+
+        # 3. Dirichlet à gauche
+        u_l, v_l = self.model(x_bc_left, y_bc_left)
+        loss_bc_left = torch.mean(u_l**2 + v_l**2)
+
+        return loss_energy, loss_bc_left, U, W_ext
 
     def train_step_adamw(self, E, nu):
         """
@@ -72,21 +97,21 @@ class PINNSolver:
         # 1. Génération des points 
 
         x_col, y_col = self.geo.generate_collocation_points(self.n_points_col)
-        x_bc_top, y_bc_top = self.geo.generate_border_top(self.n_points_bc)
-        x_bc_bot, y_bc_bot = self.geo.generate_border_bot(self.n_points_bc)
+        #x_bc_top, y_bc_top = self.geo.generate_border_top(self.n_points_bc)
+        #x_bc_bot, y_bc_bot = self.geo.generate_border_bot(self.n_points_bc)
         x_bc_left, y_bc_left = self.geo.generate_border_left(self.n_points_bc)
         x_bc_right, y_bc_right = self.geo.generate_border_right(self.n_points_bc)
 
         # 2. Calcul de la perte
-        loss_pde_eq, loss_pde_const, loss_bc_left, loss_bc_right, loss_free = self.compute_loss(E, nu, x_col, y_col, x_bc_left, y_bc_left, x_bc_right, y_bc_right, x_bc_top, y_bc_top, x_bc_bot, y_bc_bot)
+        loss_energy, loss_bc_left, U, W_ext = self.compute_loss(E, nu, x_col, y_col, x_bc_right, y_bc_right, x_bc_left, y_bc_left)
 
         # 3. Pondération  
-        total_loss = self.lambda_pde_eq * loss_pde_eq + self.lambda_pde_const * loss_pde_const + self.lambda_bc_left * loss_bc_left + self.lambda_bc_right * loss_bc_right + self.lambda_bc_free * loss_free
+        total_loss = loss_energy + 1e3 * loss_bc_left
 
         total_loss.backward()
         self.optimizer_adamw.step()
 
-        return total_loss.item(), loss_pde_eq.item(), loss_pde_const.item(), loss_bc_left.item(), loss_bc_right.item(), loss_free.item()
+        return total_loss.item(), loss_energy.item(), loss_bc_left.item()
 
 
     def train_lbfgs(self, E, nu, histories):
@@ -94,7 +119,7 @@ class PINNSolver:
         Gestionnaire d'entraînement LBFGS (Phase 2) pour le solveur A2S2.
         """
 
-        loss_total_history, loss_pde_eq_history, loss_pde_const_history, loss_bc_left_history, loss_bc_right_history, loss_bc_free_history = histories
+        loss_total_history, loss_energy_history, loss_bc_left_history = histories
 
         self.n_iter = 0
 
@@ -104,23 +129,20 @@ class PINNSolver:
             # 1. Génération des points 
             torch.manual_seed(42)
             x_col, y_col = self.geo.generate_collocation_points(self.n_points_col)
-            x_bc_top, y_bc_top = self.geo.generate_border_top(self.n_points_bc)
-            x_bc_bot, y_bc_bot = self.geo.generate_border_bot(self.n_points_bc)
+             #x_bc_top, y_bc_top = self.geo.generate_border_top(self.n_points_bc)
+            #x_bc_bot, y_bc_bot = self.geo.generate_border_bot(self.n_points_bc)
             x_bc_left, y_bc_left = self.geo.generate_border_left(self.n_points_bc)
             x_bc_right, y_bc_right = self.geo.generate_border_right(self.n_points_bc)
 
             # 2. Calcul de la perte
-            loss_pde_eq, loss_pde_const, loss_bc_left, loss_bc_right, loss_free = self.compute_loss(E, nu, x_col, y_col, x_bc_left, y_bc_left, x_bc_right, y_bc_right, x_bc_top, y_bc_top, x_bc_bot, y_bc_bot)
+            loss_energy, loss_bc_left, U, W_ext = self.compute_loss(E, nu, x_col, y_col, x_bc_right, y_bc_right, x_bc_left, y_bc_left)
 
             # 3. Pondération  
-            total_loss = self.lambda_pde_eq * loss_pde_eq + self.lambda_pde_const * loss_pde_const + self.lambda_bc_left * loss_bc_left + self.lambda_bc_right * loss_bc_right + self.lambda_bc_free * loss_free
+            total_loss = loss_energy + 1e3 * loss_bc_left
 
             loss_total_history.append(total_loss.item())
-            loss_pde_eq_history.append(loss_pde_eq.item())
-            loss_pde_const_history.append(loss_pde_const.item())
             loss_bc_left_history.append(loss_bc_left.item())
-            loss_bc_right_history.append(loss_bc_right.item())
-            loss_bc_free_history.append(loss_free.item())
+            loss_energy_history.append(loss_energy.item())
 
             self.n_iter += 1
             if self.n_iter % 100 == 0:
@@ -140,7 +162,7 @@ if __name__ == "__main__":
     E_ref = 70e9
     nu = 0.33
     L_ref = 1.0 
-    H = 0.2
+    H = 0.1
     p = 1000
 
     L = 1.0
@@ -164,33 +186,30 @@ if __name__ == "__main__":
     solver = PINNSolver(model, n_points_col=3000, n_points_bc=500, p=p, L=L, H = H, device=device, epochs=epochs)
 
     loss_total_history = []
-    loss_pde_eq_history = []
-    loss_pde_const_history = []
+    loss_energy_history = []
     loss_bc_left_history = []
-    loss_bc_right_history = []
-    loss_bc_free_history = []
+
 
     for i in range(epochs):
-        total_loss, loss_pde_eq, loss_pde_const, loss_bc_left, loss_bc_right, loss_bc_free = solver.train_step_adamw(E,nu)
+        total_loss, loss_energy, loss_bc_left = solver.train_step_adamw(E,nu)
         solver.scheduler.step()
 
         loss_total_history.append(total_loss)
-        loss_pde_eq_history.append(loss_pde_eq)
-        loss_pde_const_history.append(loss_pde_const)
+        loss_energy_history.append(loss_energy)
         loss_bc_left_history.append(loss_bc_left)
-        loss_bc_right_history.append(loss_bc_right)
-        loss_bc_free_history.append(loss_bc_free)
+
+
         if i % 250 == 0:
-            print(f"Epoch {i}: Loss = {total_loss:.2e} | Loss_PDE_eq = {loss_pde_eq:.2e} | Loss_PDE_const = {loss_pde_const:.2e} | Loss_BC_left = {loss_bc_left:.2e}| Loss_BC_right = {loss_bc_right:.2e}| Loss_BC_free = {loss_bc_free:.2e}")
+            print(f"Epoch {i}: Loss = {total_loss:.2e} ")
 
     print("Démarrage du raffinement LBFGS...")
-    histories = (loss_total_history, loss_pde_eq_history, loss_pde_const_history, loss_bc_left_history, loss_bc_right_history, loss_bc_free_history)
+    histories = (loss_total_history, loss_energy_history, loss_bc_left_history)
     solver.train_lbfgs(E, nu, histories)
 
 
-    torch.save(model.state_dict(), "A2S2_model_V0_12.pth")
+    torch.save(model.state_dict(), "A2S2_model_V0_2.pth")
     print("Modèle enregistré avec succès !")
 
-    visualize_loss(loss_total_history, loss_pde_eq_history, loss_pde_const_history, loss_bc_left_history, loss_bc_right_history, loss_bc_free_history)
+    visualize_loss(loss_total_history, loss_energy_history, loss_bc_left_history)
 
 
