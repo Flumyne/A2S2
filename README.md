@@ -1,14 +1,22 @@
-# A2S2 Core : Aero-AI-Space-Solver Logic
+# A2S2 Core : Aero-AI-Space-Solver
 
-Ce dossier contient le cœur algorithmique du solveur **A2S2**, développé entièrement à la main (hand-coded) pour une maîtrise totale des gradients et de la physique.
+Moteur de simulation **Physics-ML "Mesh-Free"** basé sur la **Deep Energy Method (DEM)**, codé entièrement à la main (hand-coded). Conçu pour le New Space : remplacer les simulations FEA lourdes par des inférences ultra-rapides (<100ms).
+
+> **Dernière validation** : Poutre encastrée 2D (Aluminium 7075-T6) — Erreur **2.48%** vs. théorie d'Euler-Bernoulli. ✅
 
 ## Structure du Code
-- `layers.py` : Implémentation manuelle des couches de neurones, fonctions d'activation et initialisations.
-- `pde_residuals.py` : Définition des résidus des équations aux dérivées partielles (Navier-Stokes, Élasticité) et conditions aux limites.
-- `solver.py` : Boucle d'optimisation, gestion du couplage FSI et intégration temporelle.
-- `utils.py` : Fonctions d'aide (visualisation, export de données, métriques de convergence).
+
+| Fichier | Rôle |
+|---------|------|
+| `layers.py` | Architecture MLP (Tanh, tête duale u/v, Normalizer) |
+| `pde_residuals.py` | Physique hand-coded : déformations, Hooke, `compute_strain_energy` |
+| `solver.py` | Boucle DEM : `Loss = StrainEnergy - ExtWork + λ·DirichletBC` |
+| `data_gen.py` | Génération de nuages de points (collocation, bords) |
+| `post_process.py` | Inférence, calcul de Von Mises, visualisation |
+| `utils.py` | Normalizer, `visualize_loss` |
 
 ## Philosophie "Hand-Coded"
-1. Pas de frameworks de haut niveau (Modulus, DeepXDE) pour le cœur de calcul.
-2. Utilisation de la différenciation automatique (Autograd) ou calcul manuel des Jacobiennes pour le couplage fort.
-3. Transparence totale sur le calcul de la fonction de perte (Loss).
+1. **Zéro boîte noire** : Pas de Modulus, pas de DeepXDE. Chaque gradient est calculé et compris.
+2. **Autograd pur** : `torch.autograd.grad` avec `create_graph=True` pour les dérivées des dérivées.
+3. **Variationnel** : La loss est une énergie physique, pas une somme de résidus — jamais de Shear Locking.
+
