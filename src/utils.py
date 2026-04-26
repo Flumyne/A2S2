@@ -51,7 +51,7 @@ class Normalizer:
         self.std = self.std.cuda()
         return self    
 
-def visualize_loss(loss_history, loss_energy_history, loss_bc_left_history):
+def visualize_loss(loss_history, loss_energy_history, loss_bc_left_history, loss_U_history, loss_W_ext_history):
     """
     Generates plots of training loss history to monitor convergence behavior.
 
@@ -63,16 +63,18 @@ def visualize_loss(loss_history, loss_energy_history, loss_bc_left_history):
 
     axes_res[0].plot(loss_history)
     axes_res[0].set_title(f"Total Loss")
-    axes_res.set_yscale('log')
+    #axes_res.set_yscale('log')
 
-    axes_res[1].plot(loss_energy_history)
-    axes_res[1].set_title(f"Energy Loss")
+    axes_res[1].plot(loss_U_history, label='Internal Energy (U)')
+    axes_res[1].plot(loss_W_ext_history, label='External Work (W_ext)')
+    axes_res[1].set_title(f"Energy Balance")
+    axes_res[1].legend()
 
     axes_res[2].plot(loss_bc_left_history)
     axes_res[2].set_title(f"Dirchlet Loss")
-    axes_res.set_yscale('log')
+    axes_res[2].set_yscale('log')
 
 
     plt.tight_layout()
-    plt.savefig("Residual_A2S2_V0_2.png", dpi=150, bbox_inches='tight')
+    plt.savefig("Residual_A2S2_V0_24.png", dpi=150, bbox_inches='tight')
     

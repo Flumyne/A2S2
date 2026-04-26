@@ -26,57 +26,62 @@ class NeuralNet(nn.Module):
     """
     MLP flexible pour le solveur PINN A2S2.
     """
-    def __init__(self, normalizer, input_dim=2, hidden_dim=32, num_layers=5, use_fourier=True):
+    def __init__(self, normalizer_spatial, normalizer_param, hidden_dim=32, num_layers=5, use_fourier=True):
         super(NeuralNet, self).__init__()
 
-        self.normalizer = normalizer
+        self.normalizer_s = normalizer_spatial
+        self.normalizer_p = normalizer_param
         
         self.use_fourier = use_fourier
 
-        def make_block(output_dim):
+        input_dim_s = 2
+        input_dim_p = 3
 
-            if use_fourier:
-                self.embedding = FourierEmbedding(input_dim, n_freq=4)
-                current_dim = self.embedding.out_features
-            else:
-                current_dim = input_dim
+        if use_fourier:
+            self.embedding = FourierEmbedding(input_dim_s, n_freq=2)
+            current_dim = self.embedding.out_features
+        else:
+            current_dim = input_dim_s
 
-            # Construction des couches cachées
-            layers = []
-            for i in range(num_layers):
-                layers.append(nn.Linear(current_dim, hidden_dim))
-                layers.append(nn.Tanh()) 
-                current_dim = hidden_dim
-            
-            # Couche de sortie
+        self.spatial_net = self.make_block(current_dim, hidden_dim, num_layers)
+        self.params_net = self.make_block(input_dim_p, 16, 2)
+
+        self.combined_net = nn.Sequential(
+            nn.Linear(hidden_dim + 16, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, 2)
+            )
+
+
+    def make_block(self,input_dim, output_dim, num_layers):
+
+        # Construction des couches cachées
+        layers = []
+        current_dim = input_dim
+        for i in range(num_layers):
             layers.append(nn.Linear(current_dim, output_dim))
-            
-            return nn.Sequential(*layers)
+            layers.append(nn.Tanh()) 
+            current_dim = output_dim
+        return nn.Sequential(*layers)
 
-        self.net_u = make_block(1)
-        self.net_v = make_block(1)
-
-
-    def forward(self, x, y):
+    def forward(self, x, y, E, nu, p):
         """
         Calcul du forward pass.
         Note : x et y doivent avoir requires_grad=True pour le calcul des résidus PDE.
         """
-        inputs = torch.cat([x, y], dim=1)
-        inputs_norm = self.normalizer.encode(inputs)
+        inputs_s = torch.cat([x, y], dim=1)
+        inputs_p = torch.cat([E, nu, p], dim=1)
+        inputs_s_norm = self.normalizer_s.encode(inputs_s)
+        inputs_p_norm = self.normalizer_p.encode(inputs_p)
         
-        if self.use_fourier:
-            inputs = self.embedding(inputs_norm)
-        else : 
-            inputs = inputs_norm
+        if hasattr(self, 'embedding') : 
+            inputs_s_norm = self.embedding(inputs_s_norm)
 
-        u_raw = self.net_u(inputs)
-        v_raw = self.net_v(inputs)
+        h_coords = self.spatial_net(inputs_s_norm)
+        h_param = self.params_net(inputs_p_norm)
 
-        # Masque sur les deplacement (hard_constraints)
-        mask_u = 1.0
-        mask_v = 1.0 
-        u = mask_u * u_raw
-        v = mask_v * v_raw
+        combined = torch.cat([h_coords, h_param], dim=1)
 
-        return u, v
+        out = self.combined_net(combined)
+
+        return out[:,0:1], out[:, 1:2]
