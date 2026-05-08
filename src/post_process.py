@@ -6,19 +6,16 @@ from utils import Normalizer
 from data_gen import Geometry
 
 
-def run_inference(model_path, L, H, E, nu, device): 
+def run_inference(model_path, L, H, E, nu, p, device): 
     """
     Génère et affiche les champs de déplacement et de contrainte.
     """
 
-    geo = Geometry(L, H, device)
-    x_sample, y_sample = geo.generate_collocation_points(3000)
-    X_sample = torch.cat([x_sample,y_sample], dim=1)
+    K_scale = 1e5
 
-    normalizer = Normalizer(X_sample, device=device)
 
     # 1. Chargement du modèle
-    model = NeuralNet(normalizer, input_dim=2, hidden_dim=50, use_fourier=False).to(device)
+    model = NeuralNet( hidden_dim=100, use_fourier=True).to(device)
     state_dict = torch.load(model_path, map_location=device)
     model.load_state_dict(state_dict)
     model.eval()
@@ -31,8 +28,15 @@ def run_inference(model_path, L, H, E, nu, device):
     x_flat = X.reshape(-1, 1).requires_grad_(True)
     y_flat = Y.reshape(-1, 1).requires_grad_(True)
 
+
+    E_adim = E/140e9
+    p_adim = (p * K_scale) / 140e9
+    E = torch.full_like(x_flat, E_adim)
+    p = torch.full_like(x_flat, p_adim)
+    nu = torch.full_like(x_flat, nu)
+
     # 3. Calcul de u,v et des contraintes (en mode Tenseur)
-    u, v = model(x_flat, y_flat)
+    u, v = model(x_flat, y_flat, E, nu, p)
 
     # 4. Calcul Von Mises (en Tenseur)
     # sigma_vm = sqrt(sig_xx^2 - sig_xx*sig_yy + sig_yy^2 + 3*sig_xy^2)
@@ -42,7 +46,6 @@ def run_inference(model_path, L, H, E, nu, device):
     # 5. Conversion vers Numpy pour Matplotlib
     x_plot = x_flat.detach().cpu().numpy()
     y_plot = y_flat.detach().cpu().numpy()
-    K_scale = 1e5
     u_plot_val = u.detach().cpu().numpy() / K_scale
     v_plot_val = v.detach().cpu().numpy() / K_scale
     vm_plot_val = vm_tensor.detach().cpu().numpy() / K_scale
@@ -71,7 +74,7 @@ def run_inference(model_path, L, H, E, nu, device):
         ax.set_ylim([-H/2, H/2])
 
     plt.tight_layout()
-    output_name = "Field_Structure_A2S2_V0_2.png"
+    output_name = "Field_Structure_A2S2_V0_298.png"
     plt.savefig(output_name, dpi=200)
     print(f"Visualisation sauvegardée sous : {output_name}")
 
@@ -79,16 +82,14 @@ def run_inference(model_path, L, H, E, nu, device):
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Paramètres de normalisation (identiques au solver)
-    E_ref = 70e9
-    L_ref = 1.0 
-    H_ref = 0.1
-    p_ref = 1000
 
     # Valeurs adimensionnelles
     L = 1.0
-    H = H_ref / L_ref
-    E = 1.0
-    nu = 0.33
+    H = 0.1
+
+    E = 100e9
+    nu = 0.32
+    p = 1500
+
     
-    run_inference('A2S2_model_V0_2.pth', L, H, E, nu, device)
+    run_inference('A2S2_model_V0_298.pth', L, H, E, nu, p, device)
